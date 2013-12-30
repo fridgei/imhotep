@@ -1,8 +1,6 @@
-from collections import defaultdict
 import json
 import logging
 import os
-import re
 from pkg_resources import iter_entry_points
 import requests
 from requests.auth import HTTPBasicAuth
@@ -11,7 +9,7 @@ import sys
 from tempfile import mkdtemp
 
 from reporters import PrintingReporter, CommitReporter, PRReporter
-from tools import PyLint, JSHint
+from repositories import AuthenticatedRepository, Repository
 from diff_parser import DiffContextParser
 from pull_requests import get_pr_info
 
@@ -40,9 +38,11 @@ class GithubRequester(object):
             auth=self.get_auth())
 
 
-def run(cmd):
+def run(cmd, cwd='.'):
     log.debug("Running: %s", cmd)
-    return subprocess.Popen([cmd], stdout=subprocess.PIPE, shell=True).communicate()[0]
+    return subprocess.Popen(
+        [cmd], stdout=subprocess.PIPE, shell=True, cwd=cwd
+    ).communicate()[0]
 
 
 class RepoManager(object):
@@ -95,7 +95,6 @@ class RepoManager(object):
                 run('rm -rf %s' % repo_dir)
 
 
-
 def apply_commit(repo, commit, compare_point="HEAD^"):
     # @@@ This is a security hazard as compare-point is user-passed in
     # data. Doesn't matter until we wrap this in a service.
@@ -110,6 +109,7 @@ def run_analysis(repo, filenames=set()):
         run_results = tool.invoke(repo.dirname, filenames=filenames)
         results.update(run_results)
     return results
+
 
 def load_plugins():
     tools = []
@@ -227,7 +227,7 @@ if __name__ == '__main__':
                     repo.name, commit, entry.result_filename, x,
                     posMap[x], violations['%s' % x])
 
-        log.info("%d violations.", error_count);
+        log.info("%d violations.", error_count)
 
     finally:
         manager.cleanup()
